@@ -1,0 +1,3 @@
+[submodule "ICML2019-TREX"]
+	path = ICML2019-TREX
+	url = https://github.com/hiwonjoon/ICML2019-TREX.git
