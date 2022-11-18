@@ -1,13 +1,15 @@
 import gym
-env = gym.make('MountainCar-v0')
+import time
+env = gym.make('PongDeterministic-v4', render_mode='human')
 # Uncomment following line to save video of our Agent interacting in this environment
 # This can be used for debugging and studying how our agent is performing
 # env = gym.wrappers.Monitor(env, './video/', force = True)
 env.reset()
 t = 0
 while True:
+	time.sleep(0.1)
 	t += 1
-	env.render()
+	#env.render()
 	observation = env.reset()
 	print(observation)
 	action = env.action_space.sample()
