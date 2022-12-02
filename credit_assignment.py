@@ -15,7 +15,8 @@ def assign_credit(rewards, t, new_reward):
 
     credit = np.zeros_like(rewards, dtype=float)
     t_start_credit = max(0, (t - credit_frames))
-    credit[t_start_credit:t] = new_reward * gamma_pdf[:t]
+    t_start_gamma = max(0, credit_frames-t)
+    credit[t_start_credit:t] = new_reward * gamma_pdf[t_start_gamma:]
 
     rewards = rewards + credit
     
@@ -32,5 +33,5 @@ def plot_reward(rewards):
 
 
 rewards = [0] * 120
-rew_after_credit = assign_credit(rewards, t=100, new_reward=8)
+rew_after_credit = assign_credit(rewards, t=20, new_reward=8)
 plot_reward(rew_after_credit)
