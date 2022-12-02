@@ -1,8 +1,8 @@
 import gym
 import time
 import sys
-sys.path.insert(0, '../ICML2019-TREX/atari')
-sys.path.insert(0, '../ICML2019-TREX/atari/baselines')
+sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari')
+sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari/baselines')
 from run_test import *
 import tensorflow as tf
     
