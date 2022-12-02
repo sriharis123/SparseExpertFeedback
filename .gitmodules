@@ -1,3 +1,6 @@
 [submodule "ICML2019-TREX"]
 	path = ICML2019-TREX
 	url = https://github.com/hiwonjoon/ICML2019-TREX.git
+[submodule "ICML2019-TREX-SparseFeedback"]
+	path = ICML2019-TREX-SparseFeedback
+	url = https://github.com/sriharis123/ICML2019-TREX-SparseFeedback.git
