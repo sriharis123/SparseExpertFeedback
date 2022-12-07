@@ -25,9 +25,6 @@ def get_env_id(env_name="pong"):
         env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
     return env_id
 
-framerate = 30 # FPS
-render_correction = 1 # locks delay to proper fps
-
 # Generate the environment and agent for feedback assignment
 def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model="./pong_ppo_checkpoints/01050"):
     env = VecFrameStack(make_vec_env(get_env_id(name), game_type, 1, seed,
@@ -69,14 +66,14 @@ def read_signal():
 
     return 0.0
 
-if __name__=="__main__":
+def feedback_from_trajectory(env, agent, global_elapsed=8, framerate=30):
+    import time
+
+    render_correction = 1 # locks delay to proper fps
 
     trajectory = []
     feedback = {} # maps timestep to feedback signal
     reward = [] # ppo agent reward
-    reward_numpy = np.array([])
-
-    env, agent = gen_env_agent() # default is pong
 
     delay = 1.0 / framerate
     cdelay = 1.0 / (framerate + render_correction)
@@ -88,7 +85,6 @@ if __name__=="__main__":
     prev_signal = 0
     t = 0
     global_start = time.time() # used for time exit
-    global_elapsed = 8 # seconds until exit
 
     done = False
     while not done:
@@ -121,15 +117,24 @@ if __name__=="__main__":
     
     env.close()
     time.sleep(1)
-
+    
     trajectory = trajectory[1:]
-    reward = np.zeros_like(reward[1:])#[:,np.newaxis]
+    fb_np = np.zeros_like(reward[1:])#[:,np.newaxis]
 
     for time in feedback:
-        reward = assign_credit(reward, time, feedback[time])
+        fb_np = assign_credit(fb_np, time, feedback[time])
 
-    plot_reward(reward)
+    return trajectory, fb_np, reward
 
-    print("Cumulative reward:", reward)
+
+if __name__=="__main__":
+
+    env, agent = gen_env_agent() # default is pong
+
+    traj, feedback, reward = feedback_from_trajectory(env, agent)
+
+    plot_reward(feedback)
+
+    print("Cumulative reward:", feedback)
 
 
