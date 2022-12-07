@@ -6,7 +6,7 @@ sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari')
 sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari/baselines')
 from run_test import *
 import tensorflow as tf
-from credit_assignment import assign_credit, plot_reward
+from credit_assignment import Credit
 
 tf.compat.v1.disable_eager_execution() # this may slow down tf calculations so might want to address this later
 
@@ -32,8 +32,8 @@ def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model=".
                            'clip_rewards':False,
                            'episode_life':False,
                        }), nstack=n)
-    agent = PPO2Agent(env, "atari", True)
-    agent.load("./pong_ppo_checkpoints/01050")
+    agent = PPO2Agent(env, game_type, True)
+    agent.load(model)
     return env, agent
 
 # Takes wrapped atari env, PPO/other RL agent, prev observation. Returns whether finished and reward for step.
@@ -66,7 +66,7 @@ def read_signal():
 
     return 0.0
 
-def feedback_from_trajectory(env, agent, global_elapsed=8, framerate=30):
+def feedback_from_trajectory(env, agent, mode='gamma', global_elapsed=8, framerate=30):
     import time
 
     render_correction = 1 # locks delay to proper fps
@@ -119,22 +119,22 @@ def feedback_from_trajectory(env, agent, global_elapsed=8, framerate=30):
     time.sleep(1)
     
     trajectory = trajectory[1:]
-    fb_np = np.zeros_like(reward[1:])#[:,np.newaxis]
+    credit = Credit(len(reward)-1, mode)
 
-    for time in feedback:
-        fb_np = assign_credit(fb_np, time, feedback[time])
+    for t in feedback:
+        credit.assign(feedback[t], t)
 
-    return trajectory, fb_np, reward
+    return trajectory, credit, reward
 
 
 if __name__=="__main__":
 
-    env, agent = gen_env_agent() # default is pong
+    env, agent = gen_env_agent(name='breakout', model='./breakout_ppo_checkpoints/01450') # default is pong
 
-    traj, feedback, reward = feedback_from_trajectory(env, agent)
+    traj, credit, reward = feedback_from_trajectory(env, agent, mode='gamma')
 
-    plot_reward(feedback)
+    credit.plot_feedback()
 
-    print("Cumulative reward:", feedback)
+    print("Cumulative reward:", credit.get_feedback())
 
 
