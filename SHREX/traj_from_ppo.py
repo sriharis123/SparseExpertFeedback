@@ -32,15 +32,15 @@ def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model=".
                            'clip_rewards':False,
                            'episode_life':False,
                        }), nstack=n)
-    agent = PPO2Agent(env, "atari", True)
-    agent.load("./pong_ppo_checkpoints/01050")
+    agent = PPO2Agent(env, game_type, True)
+    agent.load(model)
     return env, agent
 
 # Takes wrapped atari env, PPO/other RL agent, prev observation. Returns whether finished and reward for step.
 def step_env(environment, agent, trajectory, reward):
-    env.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
+    environment.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
     action = agent.act(trajectory[-1], reward[-1], False)
-    o, r, done, info = env.step(action)
+    o, r, done, info = environment.step(action)
     trajectory.append(o)
     reward.append(r)
     return done
@@ -115,7 +115,6 @@ def feedback_from_trajectory(env, agent, global_elapsed=8, framerate=30):
         
         done = time.time() - global_start > global_elapsed # for testing. comment out to continue until actual done condition
     
-    env.close()
     time.sleep(1)
     
     trajectory = trajectory[1:]
