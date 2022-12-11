@@ -4,6 +4,7 @@ import keyboard
 import sys
 sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari')
 sys.path.insert(0, '../ICML2019-TREX-SparseFeedback/atari/baselines')
+from baselines.common.trex_utils import preprocess
 from run_test import *
 import tensorflow as tf
 from credit_assignment import Credit
@@ -37,16 +38,20 @@ def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model=".
     return env, agent
 
 # Takes wrapped atari env, PPO/other RL agent, prev observation. Returns whether finished and reward for step.
-def step_env(environment, agent, trajectory, reward):
-    environment.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
+def step_env(environment, agent, trajectory, actions, reward, mask=True, env_name='pong', render=True):
+    if render:
+        environment.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
     action = agent.act(trajectory[-1], reward[-1], False)
+    # print(action)
     o, r, done, info = environment.step(action)
-    trajectory.append(o)
+    if mask:
+        o = preprocess(o, env_name) #TODO is preprocess necessary???
+    trajectory.append(o[0]) # append just HWC
+    actions.append(action)
     reward.append(r)
     return done
 
 def read_signal():
-
     if keyboard.is_pressed("1"):
         return -1.0
     elif keyboard.is_pressed("2"):
@@ -66,12 +71,40 @@ def read_signal():
 
     return 0.0
 
-def feedback_from_trajectory(env, agent, mode='gamma', global_elapsed=8, framerate=30):
+# rollout without render
+def rollout(env, agent, env_name="pong", global_elapsed=20):
+    import time
+
+    trajectory = []
+    actions = []
+    reward = [] # ppo agent reward
+    
+    trajectory.append(env.reset()) # initial value, to be erased
+    reward.append(0) # initial value, to be erased
+
+    global_start = time.time() # used for time exit
+
+    done = False
+    while not done:
+        step_env(env, agent, trajectory, actions, reward, mask=True, env_name=env_name, render=False)
+        done = (time.time()-global_start>global_elapsed)
+
+    trajectory = trajectory[1:]
+    reward = reward[1:]
+
+    print(f'trajectory length: {len(trajectory)}')
+
+    return trajectory, actions, reward
+
+
+
+def feedback_from_trajectory(env, agent, mode='uniform', env_name='pong', global_elapsed=8, framerate=30):
     import time
 
     render_correction = 1 # locks delay to proper fps
 
     trajectory = []
+    actions = []
     feedback = {} # maps timestep to feedback signal
     reward = [] # ppo agent reward
 
@@ -96,7 +129,7 @@ def feedback_from_trajectory(env, agent, mode='gamma', global_elapsed=8, framera
             cdelay = 1.0 / (framerate + render_correction)
 
         prev_time = start
-        done = step_env(env, agent, trajectory, reward)
+        step_env(env, agent, trajectory, actions, reward, mask=True, env_name=env_name)
 
         # feedback assignment. MAKE SURE TO FOCUS THE PROMPT YOU ARE RUNNING IN
         signal = read_signal()
@@ -123,14 +156,16 @@ def feedback_from_trajectory(env, agent, mode='gamma', global_elapsed=8, framera
     for t in feedback:
         credit.assign(feedback[t], t)
 
-    return trajectory, credit, reward
+    return trajectory, np.array(actions), credit, reward
 
 
 if __name__=="__main__":
 
-    env, agent = gen_env_agent(name='breakout', model='./breakout_ppo_checkpoints/01450') # default is pong
+    env, agent = gen_env_agent(name='pong', model='./pong_ppo_checkpoints/01450') # default is pong
 
-    traj, credit, reward = feedback_from_trajectory(env, agent, mode='gamma')
+    traj, actions, credit, reward = feedback_from_trajectory(env, agent, mode='atari')
+
+    env.close()
 
     credit.plot_feedback()
 
