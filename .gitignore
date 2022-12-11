@@ -4,3 +4,4 @@ models
 __pycache__/
 *.py[cod]
 test/test_script.py
+SHREX/ae*
