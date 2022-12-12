@@ -42,7 +42,7 @@ def generate_data(num_per_checkpoint, game, time, rate):
     env, agent = gen_env_agent(name=game, game_type="atari")
     for i, filename in enumerate(os.listdir(folder)):
         print(filename)
-        if i%10!=0: # increase mod to speed up testing
+        if i%1!=0: # increase mod to speed up testing
             continue
         agent.load(os.path.join(folder, filename))
         for i in range(num_per_checkpoint):
@@ -62,7 +62,7 @@ def generate_data(num_per_checkpoint, game, time, rate):
     except KeyError:
         pass
 
-    return trajectories, processed, feedbacks
+    return trajectories, processed, feedbacks, actions
 
 # trains state-action pair network using feedback and states in demonstrations
 # offline learning!
@@ -71,15 +71,18 @@ def train_model(game="pong", epochs=5000, provide_trajs=True, rounds_per_checkpo
     trajs=None
     feeds=None
     procs=None
+    acts=None
 
     if provide_trajs:
-        trajs, procs, feeds = generate_data(rounds_per_checkpoint, game, time, rate)
+        trajs, procs, feeds, acts = generate_data(rounds_per_checkpoint, game, time, rate)
         with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_trajectories', "wb") as fp:
             pickle.dump(trajs, fp)
         with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_processed', "wb") as fp:
             pickle.dump(procs, fp)
         with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_feedback', "wb") as fp:
             pickle.dump(feeds, fp)
+        with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_actions', "wb") as fp:
+            pickle.dump(acts, fp)
     else:
         if f'{game}_{time}_{rate}_trajectories' not in os.listdir(f'./saved_trajectories/{game}'):
             print("provide appropriate traj and feedback dir")
@@ -90,6 +93,8 @@ def train_model(game="pong", epochs=5000, provide_trajs=True, rounds_per_checkpo
             procs = pickle.load(fp)
         with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_feedback', "rb") as fp:
             feeds = pickle.load(fp)
+        with open(f'./saved_trajectories/{game}/{game}_{time}_{rate}_{label}_actions', "rb") as fp:
+            acts = pickle.load(fp)
 
     torch.autograd.set_detect_anomaly(True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -97,7 +102,7 @@ def train_model(game="pong", epochs=5000, provide_trajs=True, rounds_per_checkpo
 
     # direct mapping of s --> h
     encoder = Encoder().to(device)
-    encoder.load_state_dict(torch.load(f'./ae/{game}_encoder'))
+    encoder.load_state_dict(torch.load(f'./ae/{game}_encoder_mse'))
     shrex = Projection(1).to(device)
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(shrex.parameters(), lr = lr, weight_decay = 0.0)
@@ -146,7 +151,7 @@ def test():
     print(f'cuda available: {torch.cuda.is_available()}')
 
     encoder = Encoder().to(device)
-    encoder.load_state_dict(torch.load(f'./ae/pong_encoder'))
+    encoder.load_state_dict(torch.load(f'./ae/pong_encoder_mse'))
     shrex = Projection(1).to(device)
     shrex.load_state_dict(torch.load(f'./models/pong/atari_pong_0.9_0.975_32_5e-08_1_save'))
     done = False
