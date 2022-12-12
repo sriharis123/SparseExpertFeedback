@@ -18,9 +18,9 @@ class Encoder(nn.Module):
         # in_channels, out_channels, kernel_size, stride=1
         self.conv1 = nn.Conv2d(4, 16, 3, padding=1)
         torch.nn.init.kaiming_uniform_(self.conv1.weight)
-        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
+        self.conv2 = nn.Conv2d(16, 16, 3, padding=1)
         torch.nn.init.kaiming_uniform_(self.conv2.weight)
-        self.conv3 = nn.Conv2d(32, 16, 3, padding=1)
+        self.conv3 = nn.Conv2d(16, 8, 3, padding=1)
         torch.nn.init.kaiming_uniform_(self.conv3.weight)
         self.pool = nn.MaxPool2d(2, 2)
         # self.bn1 = nn.BatchNorm2d(16)
@@ -48,9 +48,9 @@ class Decoder(nn.Module):
         super().__init__()
 
         # in_channels, out_channels, kernel_size, stride=1
-        self.deconv1 = nn.ConvTranspose2d(16, 32, 2, stride=2, output_padding=1)
+        self.deconv1 = nn.ConvTranspose2d(8, 16, 2, stride=2, output_padding=1)
         torch.nn.init.kaiming_uniform_(self.deconv1.weight)
-        self.deconv2 = nn.ConvTranspose2d(32, 16, 2, stride=2)
+        self.deconv2 = nn.ConvTranspose2d(16, 16, 2, stride=2)
         torch.nn.init.kaiming_uniform_(self.deconv2.weight)
         self.deconv3 = nn.ConvTranspose2d(16, 4, 2, stride=2)
         torch.nn.init.kaiming_uniform_(self.deconv3.weight)
@@ -61,7 +61,7 @@ class Decoder(nn.Module):
     def forward(self, state):
         '''compute cumulative return for each trajectory and return logits'''
         # x = self.fc1(x)
-        x = state.view(state.shape[0], 16, 10, 10)
+        x = state.view(state.shape[0], 8, 10, 10)
         # F.relu(self.fc1...)
         # print(x.shape)
         x = F.leaky_relu(self.deconv1(x))
@@ -83,11 +83,11 @@ def test_model(game):
     decoder = Decoder().to(device)
 
     env, agent = gen_env_agent(game, "atari", model="./pong_ppo_checkpoints/01450")
-    encoder.load_state_dict(torch.load(f'./ae4/{game}_encoder'))
-    decoder.load_state_dict(torch.load(f'./ae4/{game}_decoder'))
+    encoder.load_state_dict(torch.load(f'./ae/{game}_encoder'))
+    decoder.load_state_dict(torch.load(f'./ae/{game}_decoder'))
 
-    t, a, r = rollout(env, agent, game, 5)
-    t = np.array(t)
+    t, a, r, p = rollout(env, agent, game, 5)
+    t = np.array(p)
 
     f, axarr = plt.subplots(2,4)
     for i in range(4):
@@ -112,15 +112,15 @@ def train_encoder(game='pong', epochs=1500, batch_size=32):
     print(encoder)
     print(decoder)
 
-    loss_function = torch.nn.BCELoss()
+    loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr = 1e-4, weight_decay = 0)
     eps = 1e-16
 
     print("=== ROLLOUT ===")
 
-    t, a, r = rollout(env, agent, game, 120)
+    t, a, r, p = rollout(env, agent, game, 120)
 
-    t = np.array(t)
+    t = np.array(p)
 
     losses = []
 
@@ -141,20 +141,20 @@ def train_encoder(game='pong', epochs=1500, batch_size=32):
             losses.append(loss.cpu().detach().numpy())
             print(f'Epoch {e}, loss {loss}')
         if e % 10000 == 0 and e != 0:
-            torch.save(encoder.state_dict(), f'./ae4/{game}_encoder_{e}')
-            torch.save(decoder.state_dict(), f'./ae4/{game}_decoder_{e}')
+            torch.save(encoder.state_dict(), f'./ae/{game}_encoder_mse_{e}')
+            torch.save(decoder.state_dict(), f'./ae/{game}_decoder_mse_{e}')
 
     print(np.array(losses))
 
     print("=== WRITE TO FILE ===")
 
-    torch.save(encoder.state_dict(), f'./ae4/{game}_encoder')
-    torch.save(decoder.state_dict(), f'./ae4/{game}_decoder')
+    torch.save(encoder.state_dict(), f'./ae/{game}_encoder_mse')
+    torch.save(decoder.state_dict(), f'./ae/{game}_decoder_mse')
 
 
 
 if __name__=="__main__":
-    train_encoder('pong', 20000, 32)
-    # test_model('pong')
+    # train_encoder('pong', 20000, 32)
+    test_model('pong')
     
 

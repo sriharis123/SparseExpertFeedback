@@ -38,14 +38,15 @@ def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model=".
     return env, agent
 
 # Takes wrapped atari env, PPO/other RL agent, prev observation. Returns whether finished and reward for step.
-def step_env(environment, agent, trajectory, actions, reward, mask=True, env_name='pong', render=True):
+def step_env(environment, agent, trajectory, processed, actions, reward, mask=True, env_name='pong', render=True):
     if render:
         environment.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
     action = agent.act(trajectory[-1], reward[-1], False)
     # print(action)
     o, r, done, info = environment.step(action)
     if mask:
-        o = preprocess(o, env_name) #TODO is preprocess necessary???
+        p = preprocess(o, env_name) #TODO is preprocess necessary???
+        processed.append(p[0])
     trajectory.append(o[0]) # append just HWC
     actions.append(action)
     reward.append(r)
@@ -76,6 +77,7 @@ def rollout(env, agent, env_name="pong", global_elapsed=20):
     import time
 
     trajectory = []
+    processed = []
     actions = []
     reward = [] # ppo agent reward
     
@@ -86,7 +88,7 @@ def rollout(env, agent, env_name="pong", global_elapsed=20):
 
     done = False
     while not done:
-        step_env(env, agent, trajectory, actions, reward, mask=True, env_name=env_name, render=False)
+        step_env(env, agent, trajectory, processed, actions, reward, mask=True, env_name=env_name, render=False)
         done = (time.time()-global_start>global_elapsed)
 
     trajectory = trajectory[1:]
@@ -94,7 +96,7 @@ def rollout(env, agent, env_name="pong", global_elapsed=20):
 
     print(f'trajectory length: {len(trajectory)}')
 
-    return trajectory, actions, reward
+    return trajectory, actions, reward, processed
 
 
 
@@ -104,6 +106,7 @@ def feedback_from_trajectory(env, agent, mode='uniform', env_name='pong', global
     render_correction = 1 # locks delay to proper fps
 
     trajectory = []
+    processed = []
     actions = []
     feedback = {} # maps timestep to feedback signal
     reward = [] # ppo agent reward
@@ -129,7 +132,7 @@ def feedback_from_trajectory(env, agent, mode='uniform', env_name='pong', global
             cdelay = 1.0 / (framerate + render_correction)
 
         prev_time = start
-        step_env(env, agent, trajectory, actions, reward, mask=True, env_name=env_name)
+        step_env(env, agent, trajectory, processed, actions, reward, mask=True, env_name=env_name)
 
         # feedback assignment. MAKE SURE TO FOCUS THE PROMPT YOU ARE RUNNING IN
         signal = read_signal()
@@ -156,7 +159,7 @@ def feedback_from_trajectory(env, agent, mode='uniform', env_name='pong', global
     for t in feedback:
         credit.assign(feedback[t], t)
 
-    return trajectory, np.array(actions), credit, reward
+    return trajectory, processed, np.array(actions), credit, reward
 
 
 if __name__=="__main__":
