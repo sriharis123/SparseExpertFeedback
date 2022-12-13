@@ -38,14 +38,14 @@ def gen_env_agent(name="pong", game_type="atari", seed=3141592653, n=4, model=".
     return env, agent
 
 # Takes wrapped atari env, PPO/other RL agent, prev observation. Returns whether finished and reward for step.
-def step_env(environment, agent, trajectory, processed, actions, reward, mask=True, env_name='pong', render=True):
+def step_env(environment, agent, trajectory, processed, actions, reward, mask=True, contrast=False, env_name='pong', render=True):
     if render:
         environment.render(mode="human") # uncomment for viz; look at source for replay support? issue - demonstration has 4 dims
     action = agent.act(trajectory[-1], reward[-1], False)
     # print(action)
     o, r, done, info = environment.step(action)
     if mask:
-        p = preprocess(o, env_name) #TODO is preprocess necessary???
+        p = preprocess(o, env_name, contrast=contrast) #TODO is preprocess necessary???
         processed.append(p[0])
     trajectory.append(o[0]) # append just HWC
     actions.append(action)
@@ -73,7 +73,7 @@ def read_signal():
     return 0.0
 
 # rollout without render
-def rollout(env, agent, env_name="pong", global_elapsed=20):
+def rollout(env, agent, env_name="pong", global_elapsed=20, contrast=False):
     import time
 
     trajectory = []
@@ -88,7 +88,7 @@ def rollout(env, agent, env_name="pong", global_elapsed=20):
 
     done = False
     while not done:
-        step_env(env, agent, trajectory, processed, actions, reward, mask=True, env_name=env_name, render=False)
+        step_env(env, agent, trajectory, processed, actions, reward, mask=True, contrast=contrast, env_name=env_name, render=False)
         done = (time.time()-global_start>global_elapsed)
 
     trajectory = trajectory[1:]
@@ -103,7 +103,7 @@ def rollout(env, agent, env_name="pong", global_elapsed=20):
 def feedback_from_trajectory(env, agent, mode='uniform', env_name='pong', global_elapsed=8, framerate=30):
     import time
 
-    render_correction = 1 # locks delay to proper fps
+    render_correction = 1 # locks  delay to proper fps
 
     trajectory = []
     processed = []

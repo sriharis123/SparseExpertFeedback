@@ -1,7 +1,8 @@
 models-brex
 atari_v1
-models
 __pycache__/
 *.py[cod]
 test/test_script.py
 SHREX/ae*
+SHREX/breakout_ppo_checkpoints*
+SHREX/saved_trajectories*

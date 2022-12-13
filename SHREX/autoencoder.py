@@ -16,7 +16,6 @@ class Encoder(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # in_channels, out_channels, kernel_size, stride=1
         self.conv1 = nn.Conv2d(4, 16, 7, padding=3)
         torch.nn.init.kaiming_uniform_(self.conv1.weight)
         self.conv2 = nn.Conv2d(16, 16, 5, padding=2)
@@ -24,12 +23,6 @@ class Encoder(nn.Module):
         self.conv3 = nn.Conv2d(16, 16, 3, padding=1)
         torch.nn.init.kaiming_uniform_(self.conv3.weight)
         self.pool = nn.MaxPool2d(2, 2)
-
-
-        # self.bn1 = nn.BatchNorm2d(16)
-        # self.bn2 = nn.BatchNorm2d(8)
-        # self.fc1 = nn.Linear(784, 64)
-        # self.fc2 = nn.Linear(64, 1)
 
     def forward(self, state):
         '''compute cumulative return for each trajectory and return logits'''
@@ -42,9 +35,7 @@ class Encoder(nn.Module):
         x = self.pool(F.leaky_relu(self.conv3(x)))
         # print(x.shape)
         # x = self.fc1(x)
-
         return x
-
 
 class Decoder(nn.Module):
     def __init__(self):
@@ -53,15 +44,10 @@ class Decoder(nn.Module):
         # in_channels, out_channels, kernel_size, stride=1
         self.deconv1 = nn.ConvTranspose2d(16, 16, 2, stride=2, output_padding=1)
         torch.nn.init.kaiming_uniform_(self.deconv1.weight)
-        self.deconv2 = nn.ConvTranspose2d(16, 16, 2, stride=2)#, output_padding=2)
+        self.deconv2 = nn.ConvTranspose2d(16, 16, 2, stride=2)
         torch.nn.init.kaiming_uniform_(self.deconv2.weight)
-        self.deconv3 = nn.ConvTranspose2d(16, 4, 2, stride=2)#, output_padding=3)
+        self.deconv3 = nn.ConvTranspose2d(16, 4, 2, stride=2)
         torch.nn.init.kaiming_uniform_(self.deconv3.weight)
-
-        # self.up = nn.Upsample(scale_factor=2, mode='nearest')
-        # self.bn1 = nn.BatchNorm2d(16)
-        # self.bn2 = nn.BatchNorm2d(4)
-        # self.fc1 = nn.Linear(64, 784)
 
     def forward(self, state):
         '''compute cumulative return for each trajectory and return logits'''
@@ -87,9 +73,9 @@ def test_model(game):
     encoder = Encoder().to(device)
     decoder = Decoder().to(device)
 
-    env, agent = gen_env_agent(game, "atari", model="./pong_ppo_checkpoints/01450", seed=807492863)
-    encoder.load_state_dict(torch.load(f'./ae/{game}_encoder_mse_bigkernel'))
-    decoder.load_state_dict(torch.load(f'./ae/{game}_decoder_mse_bigkernel'))
+    env, agent = gen_env_agent(game, "atari", model=f"./{game}_ppo_checkpoints/01450")
+    encoder.load_state_dict(torch.load(f'./ae/{game}_encoder_mse_bigkernel_highcontrast'))
+    decoder.load_state_dict(torch.load(f'./ae/{game}_decoder_mse_bigkernel_highcontrast'))
 
     done = False
     trajectory=[env.reset()]
@@ -97,42 +83,29 @@ def test_model(game):
     reward=[0]
     action=[]
     while not done:
-        done = step_env(env, agent, trajectory, processed, action, reward, mask=True, render=False)
+        done = step_env(env, agent, trajectory, processed, action, reward, mask=True, contrast=True, render=False)
         
         f, axarr = plt.subplots(1,2)
-        axarr[0].imshow(processed[-1])
+        axarr[0].imshow(trajectory[-1])
         axarr[1].imshow(decoder(encoder(torch.Tensor(np.array(processed[-1])).unsqueeze(0).to(device))).cpu().detach().numpy()[0])
-        # print(decoder(encoder(torch.Tensor(np.array(processed[-1])).unsqueeze(0).to(device))).cpu().detach().numpy()[0])
         plt.show()
         time.sleep(1/20.0)
         plt.close()
 
-    # t, a, r, p = rollout(env, agent, game, 5)
-    # t = np.array(p)
-
-    # f, axarr = plt.subplots(2,4)
-    # for i in range(4):
-    #     a = np.random.choice(t.shape[0])
-    #     axarr[0,i].imshow(t[a])
-    #     axarr[1,i].imshow(decoder(encoder(torch.Tensor(t[a]).unsqueeze(0).to(device)))[0].cpu().detach().numpy())
-    # plt.show()
-    
-    
-
-def train_encoder(game='pong', epochs=1500, batch_size=32, lr=1e-4):
+def train_encoder(game='pong', epochs=1500, batch_size=32, lr=1e-4, label="", tag=""):
 
     torch.autograd.set_detect_anomaly(True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'cuda available: {torch.cuda.is_available()}')
 
-    env, agent = gen_env_agent(game, "atari", model="./pong_ppo_checkpoints/01450")
+    env, agent = gen_env_agent(game, "atari", model=f"./{game}_ppo_checkpoints/01450")
     encoder=Encoder().to(device)
     decoder=Decoder().to(device)
 
     # COMMENT OUT THE FOLLOWING LINES TO WARM START MODEL PARAMS
-    # encoder.load_state_dict(torch.load(f'./ae/{game}_encoder_mse'))
-    # decoder.load_state_dict(torch.load(f'./ae/{game}_decoder_mse'))
+    # encoder.load_state_dict(torch.load(f'./ae/{game}_encoder{tag}'))
+    # decoder.load_state_dict(torch.load(f'./ae/{game}_decoder{tag}'))
 
     print(encoder)
     print(decoder)
@@ -143,7 +116,7 @@ def train_encoder(game='pong', epochs=1500, batch_size=32, lr=1e-4):
 
     print("=== ROLLOUT ===")
 
-    t, a, r, p = rollout(env, agent, game, 10)
+    t, a, r, p = rollout(env, agent, game, 120, True)
 
     t = np.array(p)
 
@@ -166,20 +139,22 @@ def train_encoder(game='pong', epochs=1500, batch_size=32, lr=1e-4):
             losses.append(loss.cpu().detach().numpy())
             print(f'Epoch {e}, loss {loss}')
         if e % 10000 == 0 and e != 0:
-            torch.save(encoder.state_dict(), f'./ae/{game}_encoder_mse_bigkernel_{e}')
-            torch.save(decoder.state_dict(), f'./ae/{game}_decoder_mse_bigkernel_{e}')
+            torch.save(decoder.state_dict(), f'./ae{label}/{game}_decoder{tag}_{e}')
+            torch.save(encoder.state_dict(), f'./ae{label}/{game}_encoder{tag}_{e}')
 
     print(np.array(losses))
 
     print("=== WRITE TO FILE ===")
 
-    torch.save(encoder.state_dict(), f'./ae/{game}_encoder_mse_bigkernel')
-    torch.save(decoder.state_dict(), f'./ae/{game}_decoder_mse_bigkernel')
+    torch.save(encoder.state_dict(), f'./ae{label}/{game}_encoder{tag}')
+    torch.save(decoder.state_dict(), f'./ae{label}/{game}_decoder{tag}')
+    with open(f'./ae{label}/loss/{game}_autoencoder_loss.txt', 'wb') as fp:
+        pickle.dump(losses, fp)
 
 
 
 if __name__=="__main__":
-    # train_encoder('pong', 50000, 16, 1e-4) # 8, 4e-6)
-    test_model('pong')
+    # train_encoder('breakout', 100000, 4, 5e-5, label='', tag='_mse_bigkernel_highcontrast') # 16, 1e-4 ;  8, 4e-6)
+    test_model('breakout')
     
 

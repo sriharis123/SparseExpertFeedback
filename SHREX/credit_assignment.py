@@ -35,6 +35,10 @@ class Credit:
 
             credit[t_start_credit:t] = (feedback * self.gamma_pdf[t_start_gamma:])[:,np.newaxis]
             self.feedbacks = self.feedbacks + credit
+        
+        elif self.mode=='uniform-dense':
+            self.feedbacks[self.t_prev:t] = feedback
+            self.t_prev = t
 
         return self.feedbacks
 
@@ -71,7 +75,7 @@ class Credit:
 
 if __name__ == "__main__":
     # credit = Credit(num_frames=120, mode='uniform')
-    credit = Credit(num_frames=1000, mode='uniform')
+    credit = Credit(num_frames=1000, mode='uniform-dense')
     credit.assign(feedback=0.75, t=50)
     # credit.plot_feedback()
     credit.assign(feedback=-0.25, t=100)
